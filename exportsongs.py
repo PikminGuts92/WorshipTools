@@ -1,5 +1,6 @@
 import os, sys
 import mido
+from pydub import AudioSegment
 
 def readFile(path):
     inFile = open(path, 'r')
@@ -51,11 +52,49 @@ def readFile(path):
         prevAbsTicks = absTicks
     
     #midi.save('thefightsong.mid')
-    
-def convertSong(sc9Path, otherFiles, songName):
+
+def convertMp3ToOgg(mp3Path, oggPath):
+    audio = AudioSegment.from_mp3(mp3Path)
+    audio.export(oggPath, format='ogg', codec='libvorbis')
+
+def convertSong(sc9Path, otherFiles, songName, exportDir):
     print(str.format('Converting \'{}\'', songName))
 
+    mp3Files = []
+
+    for file in otherFiles:
+        ext = str(file[-4:]).lower()
+        if (ext == '.mp3'):
+            mp3Files.append(file)
+    
+    # TODO: Add artist name to path
+    songDir = os.path.join(exportDir, 'JamBand - ' + songName)
+    
+    # Creates directory if not already preset
+    if (not os.path.exists(songDir)):
+        os.makedirs(songDir)
+
+    for mp3File in mp3Files:
+        mp3Name = getFileName(mp3File)
+
+        oggName = None
+
+        if (len(mp3Name) == len(songName)):
+            # Backing audio
+            oggName = 'song'
+        else:
+            # Gets last word in name
+            # (Should be guitar, bass, or drums)
+            oggName = mp3Name.split(' ')[-1].lower()
+        
+        # Converts audio
+        convertMp3ToOgg(mp3File, os.path.join(songDir, oggName + '.ogg'))
+    
     pass
+
+def getFileName(path):
+    # Returns file name without extension
+    return os.path.splitext(os.path.basename(path))[0]
 
 def exportSongs(jambandRoot, exportRoot):
     songPath = os.path.join(jambandRoot, 'songs')
@@ -67,7 +106,8 @@ def exportSongs(jambandRoot, exportRoot):
 
     # Gets all files in song directory (not recursive)
     for (dirPath, dirNames, fileNames) in os.walk(songPath):
-        files.extend(fileNames)
+        for fileName in fileNames:
+            files.append(os.path.join(dirPath, fileName))
         break
 
     # Removes non .sc9 files (Song data)
@@ -77,10 +117,10 @@ def exportSongs(jambandRoot, exportRoot):
     files = filter(lambda a: not a.endswith('.SC9'), files)
 
     for song in songs:
-        name = os.path.splitext(os.path.basename(song))[0]
-        songFiles = filter(lambda a: name in a, files)
+        name = getFileName(song)
+        songFiles = filter(lambda a: a.find(name) >= 0, files)
 
-        convertSong(song, songFiles, name)
+        convertSong(song, songFiles, name, exportRoot)
 
     return
 
